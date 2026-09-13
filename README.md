@@ -303,9 +303,9 @@ Harness prints a reminder on `HARNESS_CONTAINER_RUNTIME=apple` runs if this mapp
 
 You can run `hermes` as a long-running "claw" — a persistent agent process reachable over a messaging gateway (e.g. Telegram). Three deployment targets are documented:
 
-- [fly.io](docs/deploying-to-fly.md)
-- [Kubernetes](docs/deploying-to-k8s.md)
-- [AWS (ECS Fargate or EC2 + SSM)](docs/deploying-to-aws.md)
+- [fly.io](docs/deploying/fly.md)
+- [Kubernetes](docs/deploying/k8s.md)
+- [AWS (ECS Fargate or EC2 + SSM)](docs/deploying/aws.md)
 
 ## Developing
 
