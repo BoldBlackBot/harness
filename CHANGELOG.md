@@ -1,5 +1,74 @@
 # Changelog
 
+## [1.10.1] - 2026-09-13
+
+### Summary
+
+Dependency-refresh patch release: bumps every pinned tool in the container images. `pnpm` moves 10.34.5 → 12.3.4 (major) — global installs now land in `$PNPM_HOME/bin` (added to `PATH`), the release-cooldown env var is spelled `PNPM_CONFIG_MINIMUM_RELEASE_AGE`, and `pnpm-workspace.yaml` gains an `allowBuilds` entry for `@biomejs/biome` (v11+ makes ignored postinstalls a hard error); `pnpm/action-setup` is pinned to v6.1.0, required because pnpm ≥ 12 ships as a native binary the older action cannot install. Also bumps `pi-coding-agent` 0.80.10 → 0.85.1, `opencode-ai` 1.18.4 → 1.18.29, `hermes-agent` v2026.8.19 → v2026.8.31 (v0.21.0 "Pantheon"), `gh` 2.98.0 → 2.100.0, `uv` 0.11.30 → 0.12.10, `mise` 2026.7.11 → 2026.9.1, and rotates the `debian:stable-slim` digest. No CLI changes.
+
+### Dependency Updates
+
+- updated pnpm from 10.34.5 to 12.3.4
+- updated pnpm/action-setup from v6 (0e279bb) to v6.1.0 (ea17c68)
+- updated @earendil-works/pi-coding-agent from 0.80.10 to 0.85.1
+- updated opencode-ai from 1.18.4 to 1.18.29
+- updated hermes-agent from v2026.8.19 to v2026.8.31
+- updated gh from 2.98.0 to 2.100.0
+- updated uv from 0.11.30 to 0.12.10
+- updated mise from 2026.7.11 to 2026.9.1
+- updated debian:stable-slim base image digest
+
+### Upstream Release Notes
+
+#### @earendil-works/pi-coding-agent 0.80.10 → 0.85.1
+
+**v0.81.0** — Local llama.cpp model management (router connection, Hugging Face model search/download, explicit load/unload with live progress); extensions can register complete pi-ai providers; Qwen Token Plan built-in providers; usage accounting extended to tools, compaction, and branch summaries.
+
+**v0.81.1** — Deterministic checksummed source archives in GitHub releases; resilient compaction and branch summaries with retry lifecycle events across interactive/JSON/RPC/SDK consumers.
+
+**v0.82.0** — Constrained tool sampling (strict JSON Schema `prefer`/`require` plus OpenAI Lark/regex grammars, gated by model capability metadata); OpenRouter and Kimi Code OAuth sign-in via `/login`; session-aware streaming bash integrations exposing `PI_SESSION_ID`/`PI_PROVIDER`/`PI_MODEL` env.
+
+**v0.82.1** — Claude Opus 5 on Anthropic and Bedrock with adaptive thinking (incl. `xhigh`), inference profiles, prompt caching; `ANTHROPIC_AUTH_TOKEN` gateway bearer auth; faster revalidating model catalogs.
+
+**v0.83.0** — `pi auth print-api-key` / `print-bearer-token` credential export with OAuth refresh; headless OpenRouter sign-in (paste redirect URL/auth code over SSH); Claude Opus 5 on GitHub Copilot with 1M context; **breaking:** bundled TypeBox upgraded to 1.3.7 removing deprecated APIs (`Type.Base`, `Value.Mutate`, …) — extensions must migrate.
+
+**v0.84.0** — Fullscreen TUI mode (sticky editor, independently scrollable transcript, draggable scrollbars); Mermaid diagram and Unicode LaTeX rendering in transcripts; per-directory context overrides via `AGENTS.override.md`; arbitrary OpenAI-compatible `samplingParams`; Baseten provider. **Breaking:** `message_update` JSON/RPC events now emit only deltas (cumulative `message` field removed); `ModelsStreamTransforms` renamed `ModelsRequestTransforms`.
+
+**v0.84.1** — Qwen Token Plan Individual provider; `pi auth check` credential readiness verification; improved fullscreen interaction (multi-click selection, half-page scrolling).
+
+**v0.84.2** — Fullscreen transcript search (`Ctrl+Shift+F` with incremental highlighting); configurable default tools globally or per project; configurable fullscreen exit output.
+
+**v0.84.3** — Optional native PowerShell tool on Windows; safer managed updates (stage, verify, atomically activate); `/thinking` selector with searchable defaults and session-scoped persistence. **Breaking:** `GoogleThinkingLevel` renamed `GoogleApiThinkingLevel` (+ `ResolvedGoogleThinkingLevel`).
+
+**v0.84.4** — Terminal capability overrides (hyperlink/image/truecolor); extension UI prompt events; RPC `clear_queue` for steering/follow-up messages; fullscreen selection copy controls.
+
+**v0.85.0** — Persistent Claude thinking effort across turns (with signed-thinking mismatch recovery); fullscreen transcript controls (jump-to-latest, embedded working indicator); restorable in-memory sessions via the SDK.
+
+**v0.85.1** — GPT-6 Astra for OpenAI API keys and Codex subscriptions; 5× faster Alt+wheel scrolling in fullscreen; fix for SDK import failures from accidentally published internals.
+
+#### opencode-ai 1.18.4 → 1.18.29
+
+**v1.18.5–v1.18.9** — Claude adaptive-thinking handling across more response shapes; Mistral prompt caching and reasoning-history fixes; branch-specific repository caches; MCP OAuth/session reconnect fixes; legacy MCP SDK client compatibility restored; V2 desktop sidecar opt-in backed by the bundled CLI service.
+
+**v1.18.10–v1.18.15** — Auto-discovery of available Modal models; chronological message ordering fixed for imported/legacy IDs; compaction keeps complete recent turns with clearer summaries for smaller models; Azure GPT-5.5+ reasoning fixes; xAI single device-code login for headless/remote; PDF attachments for vision-capable Copilot models; blob attachments fixed in web UI.
+
+**v1.18.16–v1.18.20** — Unknown top-level config fields ignored instead of failing parsing; retry jitter to prevent retry storms; native OpenAI/Anthropic passthroughs for Cloudflare AI Gateway; Codex rate limits matched to ChatGPT tiers; resumable subagent failures surfaced with `task_id`; retries for `network_error` finish reasons; Azure CLI Entra ID sign-in (no API key).
+
+**v1.18.21–v1.18.25** — Continue on unknown finish reasons; Vertex AI multi-region Gemini routing through REP endpoints; Cloudflare AI Gateway fixes for third-party providers and dotted Anthropic model IDs; GitHub auth for immutable OIDC subject tokens; Bedrock reasoning responses no longer cached into unreplayable empty messages.
+
+**v1.18.26–v1.18.29** — Claude 5 stale-thinking-block tolerance; Bedrock GPT-5.6 `none` reasoning effort; five-minute default provider header/streamed-chunk timeouts (disable with `false`); Anthropic thinking block-binding limited to Claude 5.1+; Codex OAuth model filtering recognizes integer GPT versions (e.g. `gpt-6`).
+
+#### hermes-agent v2026.8.19 → v2026.8.31
+
+**v2026.8.27 (v0.20.6)** — Patch rollup of ~525 PRs since v0.20.5, tagged for downstream consumers: consent-gated real-profile browsing and a broad fix/stabilization wave.
+
+**v2026.8.31 (v0.21.0, "Pantheon")** — Major rollup (~525 PRs in the tag window; ~2,475 PRs since v0.20.0): Bot Mode built into the desktop app (society of named agents with group chats); `hermes peer` bot-to-bot DMs; cron jobs with persistent memory and continuity; live subagent steering from `delegate_task`; merged MCP command center with health checks; Ctrl+P command palette and fuzzy `/model` picker; agent-driven in-app browser; six new providers (Meta Model API, CommandCode, Tencent TokenPlan, Nebius, …); write-approval protection for AGENTS.md/skills/memory against prompt injection.
+
+### Changes
+
+- 766959c deps: bump pnpm 10.34.5 → 12.3.4 (major) + action-setup v6.1.0 (#185)
+- 4bff54a deps: bump gh 2.98.0→2.100.0, pi 0.80.10→0.85.1, opencode 1.18.4→1.18.29, uv 0.11.30→0.12.10, mise 2026.7.11→2026.9.1, hermes-agent v2026.8.19→v2026.8.31, debian digest (#184)
+
 ## [1.10.0] - 2026-09-02
 
 ### Summary
