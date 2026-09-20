@@ -26,6 +26,9 @@ This project pins nine external dependencies across its Dockerfiles. Check each 
 | `pnpm` | `Dockerfile` ~L51 | version in `corepack prepare pnpm@<VER>` | `npm show pnpm version` |
 | `mise` | `Dockerfile` ~L61–65 | `ENV MISE_VERSION=<VER>` + `MISE_AMD64_SHA256` / `MISE_ARM64_SHA256` checksums | `gh release list --repo jdx/mise --limit 5` |
 | `debian:stable-slim` | `Dockerfile` L1 | digest in `FROM debian:stable-slim@sha256:...` | `docker manifest inspect debian:stable-slim` — see note below |
+| uv-managed CPython | `Dockerfile.hermes` ~L106 | version in `uv python install --no-cache <VER>` (also passed to `uv venv --python <VER>`) | `uv python list --all-versions 3.13` — take newest 3.13.x |
+
+The uv-managed CPython pin matters beyond the interpreter: python-build-standalone bundles its own SQLite, which is what `hermes`' `_sqlite3` links at runtime. Any bump must keep the bundled SQLite at or above the minimum recorded in the `Dockerfile.hermes` comment near the pin (WAL-reset corruption fix line). Verify after bumping with the built image: `/opt/hermes-agent/venv/bin/python3 -c "import sqlite3; print(sqlite3.sqlite_version)"`.
 
 ## Steps
 
