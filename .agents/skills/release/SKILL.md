@@ -132,17 +132,13 @@ Edit the `version` field directly in `package.json`. Do not use `npm version` �
 
 ## Step 5b: Update hermes image tag in deploy guides
 
-The hermes claw deploy guides pin the upstream image tag (e.g. `ghcr.io/boldblackai/harness:hermes-1.8.1`). Update every occurrence to match the new `package.json` version. Each guide exists twice — the in-repo copy (`docs/deploying-to-*.md`, linked from README) and the docs-site copy (`docs/deploying/*.md`) — keep both in sync.
+The hermes claw deploy guides pin the upstream image tag (e.g. `ghcr.io/boldblackai/harness:hermes-1.8.1`). Update every occurrence to match the new `package.json` version. The guides live in `docs/deploying/` (`fly.md`, `k8s.md`, `aws.md`).
 
 ```toml
 image = "ghcr.io/boldblackai/harness:hermes-<new-version>"
 ```
 
-Search for the pattern `hermes-[0-9]` in these files and replace all occurrences with the new version:
-
-- `docs/deploying-to-fly.md` and `docs/deploying/fly.md`
-- `docs/deploying-to-k8s.md` and `docs/deploying/k8s.md`
-- `docs/deploying-to-aws.md` and `docs/deploying/aws.md`
+Search for the pattern `hermes-[0-9]` in `docs/deploying/` and replace all occurrences with the new version.
 
 Do not edit `README.md` — it only links to the guides.
 
