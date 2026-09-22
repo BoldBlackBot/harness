@@ -1,5 +1,38 @@
 # Changelog
 
+## [1.10.2] - 2026-09-21
+
+### Summary
+
+Dependency-refresh patch release. The hermes image now installs a uv-managed CPython (3.13.14) instead of the Debian system python3, so hermes runs against the SQLite bundled by python-build-standalone (3.53.1) rather than Debian trixie's libsqlite3 3.46.1 — which is exposed to the WAL-reset corruption bug fixed upstream in SQLite 3.51.3. Also bumps `hermes-agent` v2026.8.31 → v2026.9.11 (the state.db reliability release), `opencode-ai` 1.18.29 → 1.18.30, `uv` 0.12.10 → 0.12.13, `pnpm` 12.3.4 → 12.4.1, `mise` 2026.9.1 → 2026.9.6, and rotates the `debian:stable-slim` digest. No CLI changes.
+
+### Dependency Updates
+
+- updated hermes-agent from v2026.8.31 to v2026.9.11
+- updated opencode-ai from 1.18.29 to 1.18.30
+- updated uv from 0.12.10 to 0.12.13
+- updated pnpm from 12.3.4 to 12.4.1
+- updated mise from 2026.9.1 to 2026.9.6
+- updated debian:stable-slim base image digest
+
+### Upstream Release Notes
+
+#### hermes-agent v2026.8.31 → v2026.9.11
+
+**v2026.9.7 (v0.21.1)** — Rollup patch of main since v0.21.0 for tagged deployments: codebase modularization, file-operation and startup performance work, provider/model updates, desktop session controls and browser annotations, MCP authorization improvements, cron scheduling/delivery fixes, and delegation reliability improvements.
+
+**v2026.9.11 (v0.21.2)** — The state.db patch release, fixing the fragility v0.21.0's session-store rewrite introduced for some installs: no more second writers cancelling each other's locks (profile gateways, dashboard, cron lifecycle guard, `doctor --fix`), healthy WAL databases no longer wedge on `DeletedWalGenerationError`, FTS-index damage degrades to search-only instead of failing the conversation, one corrupt row no longer kills `sessions list`/export/insights, sessions never bind to or read another profile's database, and opening state.db no longer takes the write lock when nothing needs writing (one-shot processes behind a busy gateway: 4–20 s stall → 0.01 s). Also: multi-profile isolation hardening (secondary-profile bots no longer inherit the default profile's allow-lists, credentials, or vault secrets), desktop backend spawn storms fixed, a password-blind credential vault (1Password/Bitwarden/local vault sign-in, payment, and address fill without the agent seeing secrets), a curated SHA-pinned plugin catalog with a unified Plugins page, the Nous free tier with `/login` from chat, and a guided first launch.
+
+#### opencode-ai 1.18.29 → 1.18.30
+
+**v1.18.30** — Astra system prompt for GPT-6 models; preserved Bedrock DeepSeek model IDs (incl. ARN-based) so they resolve correctly; Azure and OpenAI provider SDK compatibility updates; reasoning-effort variants for supported GitLab GPT and Claude models.
+
+### Changes
+
+- 21703f5 deps: bump opencode 1.18.30, uv 0.12.13, pnpm 12.4.1, mise 2026.9.6, hermes v2026.9.11, debian digest (#189)
+- 16d5e81 docs: fix release skill and README deploy-guide paths (#187)
+
+
 ## [1.10.1] - 2026-09-13
 
 ### Summary
