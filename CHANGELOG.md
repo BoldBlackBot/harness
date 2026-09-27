@@ -1,5 +1,42 @@
 # Changelog
 
+## [1.10.3] - 2026-09-27
+
+### Summary
+
+Dependency-refresh patch release. The headline is the `hermes-agent` v2026.9.14 bump (a remote-desktop session-expiry fix and a state.db writer-handle leak fix) and the `pi-coding-agent` 0.86.1 bump (prompt-cache warming, a `/bug` reporter, and a new Meta Muse provider). Also bumps `gh` 2.101.0, `opencode-ai` 1.18.31, `uv` 0.12.17, `pnpm` 12.5.1, `mise` 2026.9.12, and CPython 3.13.15. No CLI changes.
+
+### Dependency Updates
+
+- updated hermes-agent from v2026.9.11 to v2026.9.14
+- updated @earendil-works/pi-coding-agent from 0.85.1 to 0.86.1
+- updated gh from 2.100.0 to 2.101.0
+- updated opencode-ai from 1.18.30 to 1.18.31
+- updated uv from 0.12.13 to 0.12.17
+- updated pnpm from 12.4.1 to 12.5.1
+- updated mise from 2026.9.6 to 2026.9.12
+- updated CPython (uv-managed, hermes image) from 3.13.14 to 3.13.15
+
+### Upstream Release Notes
+
+#### hermes-agent v2026.9.11 → v2026.9.14
+
+**v2026.9.14** — Patch rollup for tagged deployments. Remote dashboard sessions no longer expire on Desktop refresh bursts (concurrent refresh-token rotations are coalesced so a wake burst can no longer trip reuse detection and revoke the session); refresh runs off the event loop so a slow identity provider no longer freezes `/api/status`. Long-lived processes (gateway, dashboard backend, ACP/CLI readers) stop leaking duplicate state.db writer handles, and readers attach read-only.
+
+#### @earendil-works/pi-coding-agent 0.85.1 → 0.86.1
+
+**v0.86.0** — Cost-aware prompt-cache warming during long tool runs and optionally while idle; `/bug` reporting with redacted diagnostics, optional transcripts, or ZIP export; transcript-aware prompt and tool updates that survive resume and branch navigation; the offline Radius model catalog; per-model compaction budgets. Breaking changes to the custom-provider streaming API (`Context` → normalized `TranscriptContext`) and to `ToolCall.arguments`/`ToolResultMessage.details` typing.
+
+**v0.86.1** — Meta Muse provider sign-in (`/login meta` or `META_API_KEY`); faster repeat launch via Node's persistent compile cache; fixed clipboard copy in containers and WSL without WSLg; fixed z.ai `Prompt too long` not being recognized as context overflow.
+
+#### opencode-ai 1.18.30 → 1.18.31
+
+**v1.18.31** — Restored ACP session model, effort, mode, and reasoning chunk boundaries when loading, resuming, or forking sessions; remote config authentication errors are now shown during startup; summarized adaptive thinking requested for GitHub Copilot models.
+
+### Changes
+
+- ad731b3 deps: bump gh 2.100.0->2.101.0, pi 0.85.1->0.86.1, opencode 1.18.30->1.18.31, uv 0.12.13->0.12.17, pnpm 12.4.1->12.5.1, mise 2026.9.6->2026.9.12, hermes v2026.9.11->v2026.9.14, CPython 3.13.14->3.13.15 (#191)
+
 ## [1.10.2] - 2026-09-21
 
 ### Summary
