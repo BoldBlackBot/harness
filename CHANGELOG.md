@@ -1,5 +1,42 @@
 # Changelog
 
+## [1.10.4] - 2026-10-04
+
+### Summary
+
+Dependency-refresh patch release. The headline is the `hermes-agent` v2026.9.24 bump (two rollup tags: a Desktop plugin SDK wave, a Connectors page with one-click MCP bring-up for installed plugins, per-profile stop/start/restart, and webhook deliveries mirrored into chat) and the `pi-coding-agent` 0.87.1 bump (Claude Opus 5.5, GPT-6 Sol/Luna support, and Grok 4.7 as the new xAI default). Also bumps `opencode-ai` 1.18.32, `uv` 0.12.19, `pnpm` 12.7.0, and `mise` 2026.9.15. No CLI changes.
+
+### Dependency Updates
+
+- updated hermes-agent from v2026.9.14 to v2026.9.24
+- updated @earendil-works/pi-coding-agent from 0.86.1 to 0.87.1
+- updated opencode-ai from 1.18.31 to 1.18.32
+- updated uv from 0.12.17 to 0.12.19
+- updated pnpm from 12.5.1 to 12.7.0
+- updated mise from 2026.9.12 to 2026.9.15
+
+### Upstream Release Notes
+
+#### hermes-agent v2026.9.14 → v2026.9.24
+
+**v2026.9.21** — Rollup of ~1,800 PRs into a tagged release (curated notes deferred to v0.22.0). Host-wide gateway singleton lock; Desktop attaches to the running host backend instead of spawning a second one; `--format stream-json` structured output for the CLI; `skills.auto_load` pins skills into every new session's prompt; `session_search` after/before bounds; `hermes sessions set-journal-mode`; LTX 2.5 and Kling O3 in the video catalogs; a large run of profile/multiplex isolation, cron, kanban, and state.db fixes.
+
+**v2026.9.24** — Rollup of ~460 PRs into a tagged release. Desktop plugin SDK wave (composer draft API, session-list and row-decoration slots, typed settings/skills/toolsets/profiles bridges, public event bridge for plugin backends); Simple/Advanced interface mode; Connectors page replacing the MCP tab, with "Connect now" bringing up a freshly installed plugin's MCP servers in every open chat; French, German, and Spanish Desktop catalogs plus an RTL/LTR text-direction setting; custom model entry from the composer and Settings; per-profile stop/start/restart and `gateway.standalone`; live dock showing the standing `/goal` and queued prompts in CLI and TUI; webhook deliveries mirrored into the target chat session; GPT-6 Sol/Terra/Luna and Claude Opus 5.5 in the Nous and OpenRouter catalogs; hot-path performance work across config loading, tool registry, and gateway message handling.
+
+#### @earendil-works/pi-coding-agent 0.86.1 → 0.87.1
+
+**v0.87.0** — Canonical session context and extension boundaries: append-only model-context edits (`ContextEditEntry`) and actionable `turn_end` / `agent_before_settle` lifecycle hooks; `context_with_system` full-transcript extensions; per-model image input limits with cache-safe resizing. Breaking changes: `shouldStopAfterTurn` removed in favor of `finishTurn`; `SessionManager` is canonical for provider context; expanded `TurnEndEvent` and new `AgentBeforeSettleEvent` shapes. Fixes include string context-edit replacements, edited-context usage accounting, `/bug` uploads in offline mode, and text files starting with `GIF` being misclassified as images.
+
+**v0.87.1** — Latest frontier models: Claude Opus 5.5 on Anthropic (adaptive thinking, 1M context window), GPT-6 Sol and GPT-6 Luna (OpenAI API keys, Codex subscriptions, GitHub Copilot); xAI sessions now default to Grok 4.7. Fixes: split-turn compaction summaries with Claude Fable 5.1, missing or invalid `--mode` values now error instead of being silently ignored, image-only user messages no longer rejected by some OpenAI-compatible providers.
+
+#### opencode-ai 1.18.31 → 1.18.32
+
+**v1.18.32** — Bedrock image attachments are only hoisted for Claude, Nova, and Llama 4 models; fixed Together AI streaming usage reporting.
+
+### Changes
+
+- 94247dd deps: bump pi 0.86.1->0.87.1, opencode 1.18.31->1.18.32, uv 0.12.17->0.12.19, pnpm 12.5.1->12.7.0, mise 2026.9.12->2026.9.15, hermes v2026.9.14->v2026.9.24 (#193)
+
 ## [1.10.3] - 2026-09-27
 
 ### Summary
