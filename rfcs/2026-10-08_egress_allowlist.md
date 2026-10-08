@@ -107,19 +107,14 @@ agent container joins only the isolated network:
                     │                                            │
  default bridge ────┤   ┌──────────────────────────┐             │
  (has external      │   │ egress gateway container │             │
-  route) ───────────┼──▶│  squid  (HTTP CONNECT,   │             │
-                    │   │          dstdomain ACL)  │             │
-                    │   │  dnsmasq (split-horizon  │             │
-                    │   │          DNS)            │             │
-                    │   │  socat   (raw-TCP        │             │
-                    │   │          forwards)       │             │
+  route) ───────────┼──▶│  squid (HTTP CONNECT,    │             │
+                    │   │         dstdomain ACL)   │             │
                     │   └───────────┬──────────────┘             │
                     │               │ only attach point with     │
                     │  harness-egress-<runid>  (──internal ──)   │
                     │               │ no external routing        │
                     │   ┌───────────┴──────────────┐             │
                     │   │ agent container          │             │
-                    │   │  --dns <gateway-ip>      │             │
                     │   │  HTTPS_PROXY=gateway:3128│             │
                     │   └──────────────────────────┘             │
                     └────────────────────────────────────────────┘
@@ -139,7 +134,7 @@ membership already implies.
 one entry per line (`#` comments allowed):
 
 ```text
---egress "api.anthropic.com,api.openai.com,openrouter.ai,warehouse.example.internal:5439"
+--egress "api.anthropic.com,api.openai.com,openrouter.ai,.amazonaws.com"
 --egress @/etc/harness/egress-allowlist.txt
 ```
 
@@ -148,12 +143,12 @@ Entry grammar:
 | Entry | Meaning |
 |-------|---------|
 | `host` | exact hostname, HTTPS (port 443) via CONNECT |
-| `host:port` | exact hostname, TCP on `port` (raw-TCP forward) |
-| `.domain` or `*.domain` | suffix match: any host under `domain` (port rules as above) |
+| `host:port` | non-443 port — **rejected in v1**; reserved for the deferred raw-TCP extension (see below) |
+| `.domain` or `*.domain` | suffix match: any host under `domain` — e.g. `.amazonaws.com` covers `redshift-data.<region>.amazonaws.com` |
 
 - Port defaults to 443 (HTTP(S) via squid CONNECT).
-- Any non-443 port entry (e.g. `:5439` for Redshift) is served by the
-  raw-TCP forward path, so **proxy-unaware clients still work** (see below).
+- Non-443 port entries are rejected in v1 with an error pointing at the
+  deferred raw-TCP extension (direct database drivers — see below).
 - `host` may also be an IP literal.
 
 ### How each destination class is enforced
@@ -166,32 +161,36 @@ generated `dstdomain` ACL, and forwards allowlisted names only —
 re-resolving per connection, so CDN churn is handled. Denied destinations
 fail closed with a proxy error.
 
-**Raw TCP (e.g. Redshift 5439) — split-horizon DNS + socat forwards.**
-Postgres clients (psycopg2, asyncpg, the `psql` CLI) do not honor proxy env
-vars, so CONNECT alone cannot serve them. For every non-443 allowlist entry
-harness configures:
+**AWS services via the `aws` CLI / SDKs — plain HTTPS CONNECT.** The AWS
+CLI (botocore) honors `HTTPS_PROXY`, and every API call — including the
+Redshift Data API (`aws redshift-data ...`, served at
+`redshift-data.<region>.amazonaws.com:443`) — is an HTTPS request whose
+hostname travels unresolved in the CONNECT line. A `.amazonaws.com` suffix
+entry (or a narrower regional prefix) covers it. No client-side DNS and no
+special path are required.
 
-1. **dnsmasq** on the gateway answers that hostname with the gateway's own
-   IP (the agent container uses `--dns <gateway-ip>`), and forwards every
-   other name upstream normally.
-2. **socat** (or equivalent) listens on the gateway for that `host:port`
-   entry and forwards to the real destination, **re-resolving the hostname
-   at each connection** so IP churn is again handled.
+**Raw TCP (direct database drivers) — deferred extension, not in v1.**
+Direct-driver Redshift (psql / psycopg2 / redshift_connector on port 5439)
+is NOT plain HTTP: it is a PostgreSQL-wire-protocol session — TLS-secured
+in protocol (`sslmode=require`, TLS 1.2+) but invisible to an HTTP proxy —
+and these clients ignore proxy env vars. v1 of Tier 2 rejects non-443
+allowlist entries with a clear error. The pre-designed split-horizon
+machinery is retained under "Deferred: raw-TCP forwarding" below and lands
+only behind a confirmed direct-driver use case.
 
-The agent's connection to `warehouse.example.internal:5439` (its real
-Redshift-class endpoint) "just works" — DNS quietly lands it on the gateway — and non-allowlisted
-hostnames either fail in squid (HTTP) or fail to route at all (raw TCP to a
-non-forwarded port/host).
-
-**DNS itself** leaves the gateway unfiltered (dnsmasq must reach upstream
-resolvers). This leaks which names the container looks up, not the traffic.
-Acceptable; noted.
+**DNS.** v1 does not intercept DNS. Proxied HTTPS needs no client-side
+resolution — the hostname rides the CONNECT line to the gateway, which
+resolves and re-resolves it per connection. Un-proxied connection attempts
+to any destination fail at the network boundary. Which names the container
+looks up via docker's embedded DNS is not filtered; that leaks lookups, not
+traffic. Acceptable; noted.
 
 ### Gateway image
 
-New in-repo image `Dockerfile.egress-proxy` (Debian stable-slim + squid +
-dnsmasq + socat; config generated per run from the allowlist and mounted in,
-not baked in), tagged `egress-proxy-<version>`, built / signed / SLSA-attested
+New in-repo image `Dockerfile.egress-proxy` (Debian stable-slim + squid;
+config generated per run from the allowlist and mounted in, not baked in —
+the deferred raw-TCP extension would add dnsmasq + socat), tagged
+`egress-proxy-<version>`, built / signed / SLSA-attested
 by the existing `docker.yml` pipeline alongside the agent variants, subject
 to the repo's digest-pinning and 7-day-cooldown dependency rules. The
 gateway runs with `--cap-drop=ALL --security-opt no-new-privileges` and the
@@ -209,8 +208,8 @@ existing Dockerfile conventions.
 2. `docker network create --internal harness-egress-<runid> <subnet>`;
    gateway attaches to this network (static IP `.2`) **and** the default
    bridge (the external leg).
-3. Agent container: `--network harness-egress-<runid> --dns <gateway-ip>`
-   plus the proxy env injection. `--env-file` values still flow in; because
+3. Agent container: `--network harness-egress-<runid>` plus the proxy env
+   injection (no `--dns` in v1 — see DNS note above). `--env-file` values still flow in; because
    harness appends its `-e` args after `--env-file`, harness's proxy vars
    take precedence over any same-key values in a user env file (last wins in
    docker) — deliberate: the fence hint must not be silently overridable,
@@ -235,8 +234,9 @@ existing Dockerfile conventions.
 
 ### What the agent sees
 
-`HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY` env vars and DNS answers that map
-allowlisted raw-TCP hosts to the gateway. This is a convenience, not the
+`HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY` env vars pointing at the gateway.
+(With the deferred raw-TCP extension, also split-horizon DNS answers.) This
+is a convenience, not the
 security boundary — the boundary is `--internal` routing. The RFC's contract
 statement for docs: **egress allowlisting is enforced by network topology;
 env vars are hints that reduce surprise, not controls.**
@@ -259,8 +259,8 @@ env vars are hints that reduce surprise, not controls.**
   scenario — run with `--egress` against a local "destination" (published
   port on a helper container on the default bridge, allowlisted): agent
   reaches it; a non-allowlisted destination (another helper container)
-  times out / proxy-denies. Redshift-class raw TCP covered by pointing the
-  allowlist at the helper's `host:port` with a `psql`-style TCP client.
+  times out / proxy-denies. (The deferred raw-TCP extension adds its own
+  scenario if it lands.)
 - CI: no new workflows; smoke suite runs where it does today.
 
 ## Documentation updates
@@ -285,10 +285,11 @@ Walked one-by-one with the PR; rulings pinned in the table below.
   envoy-based vs. purpose-built proxy. *Recommendation:* in-repo
   multi-service image — battle-tested components, no new language runtime,
   fits the existing build/sign/attest pipeline.
-- **D4 — Raw TCP path.** Split-horizon DNS + re-resolving forwards vs.
-  CONNECT-only (excludes Redshift-class clients) vs. session-start IP
-  allowlists (churns). *Recommendation:* split-horizon — the only option
-  that serves proxy-unaware clients with hostname granularity.
+- **D4 — Raw TCP path.** Steered in PR review (2026-10-08): Redshift is
+  accessed through the `aws` CLI (Redshift Data API = HTTPS on 443;
+  botocore honors `HTTPS_PROXY`), so v1 is **CONNECT-only** and the
+  split-horizon machinery is deferred behind a confirmed direct-driver
+  need. Access-pattern confirmation pending from the requester.
 - **D5 — Apple runtime stance for `--egress`.** Fail closed until verified
   vs. block the whole feature on apple support. *Recommendation:* fail
   closed with a clear error; document the gap (same posture as the
@@ -301,7 +302,7 @@ Walked one-by-one with the PR; rulings pinned in the table below.
 | D1 | Scope: phased both tiers | | |
 | D2 | Flag surface as specified | | |
 | D3 | Gateway: in-repo squid+dnsmasq+socat | | |
-| D4 | Raw TCP: split-horizon DNS + forwards | | |
+| D4 | Raw TCP: v1 CONNECT-only; split-horizon deferred | Steered in PR review 2026-10-08 (aws-CLI access is HTTPS; direct-driver need unconfirmed) | 2026-10-08 |
 | D5 | Apple runtime: fail closed for `--egress` | | |
 
 ## Implementation checklist
@@ -326,11 +327,19 @@ Tier 2:
       sweep
 - [ ] Gateway lifecycle (start `--rm -d`, config mount, stop + network rm on
       exit)
-- [ ] Agent container wiring: `--dns`, proxy env injection (after
-      `--env-file`), static gateway IP
-- [ ] squid ACL / dnsmasq split-horizon / socat forward generation from the
-      allowlist
+- [ ] Agent container wiring: proxy env injection (after `--env-file`),
+      static gateway IP
+- [ ] squid ACL generation from the allowlist (HTTPS/CONNECT, 443 only;
+      non-443 entries rejected with a clear error)
 - [ ] e2e argv tests + integration smoke scenario (allowlisted pass,
       non-allowlisted fail, raw-TCP forward)
 - [ ] USAGE / README ("Egress control" section) / AGENTS.md updates
 - [ ] RFC status → Implemented (Tier 2)
+
+Deferred extension — raw-TCP forwarding (design retained, not scheduled;
+requires a confirmed direct-driver use case and a re-lock of this RFC):
+
+- [ ] dnsmasq split-horizon DNS + socat re-resolving forwards on the
+      gateway for `host:port` entries
+- [ ] Un-reject non-443 allowlist entries; `--dns <gateway-ip>` wiring
+- [ ] e2e + integration smoke scenario for the raw-TCP path
