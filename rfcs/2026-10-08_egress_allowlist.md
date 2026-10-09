@@ -145,17 +145,31 @@ Entry grammar:
 | `host` | exact hostname, HTTPS (port 443) via CONNECT |
 | `host:port` | non-443 port — **rejected in v1**; reserved for the deferred raw-TCP extension (see below) |
 | `.domain` or `*.domain` | suffix match: any host under `domain` — e.g. `.amazonaws.com` covers `redshift-data.<region>.amazonaws.com` |
+| `host.docker.internal[:port]` | **host-local** destination (see below): direct connection, never proxied |
 
 - Port defaults to 443 (HTTP(S) via squid CONNECT).
 - Non-443 port entries are rejected in v1 with an error pointing at the
-  deferred raw-TCP extension (direct database drivers — see below).
+  deferred raw-TCP extension (direct database drivers — see below) —
+  **except host-local entries**, which connect directly (below).
+- `host.docker.internal[:port]` entries are host-local: served by a
+  direct connection (added to `NO_PROXY`), never through the gateway.
+  In v1 the `:port` part is advisory (the whole host is reachable) —
+  port-level enforcement against host services belongs to the deferred
+  raw-TCP extension.
+- An empty allowlist — `--egress none`, or a `@file` whose entries are
+  all comments — is valid and selects **airgap mode** (below).
 - `host` may also be an IP literal.
 
 ### How each destination class is enforced
 
 **HTTP(S) — CONNECT through squid.** Harness injects
 `HTTPS_PROXY=http://<gateway-ip>:3128` (and `HTTP_PROXY`,
-`NO_PROXY=localhost,127.0.0.1`) into the agent container. Squid receives the
+`NO_PROXY=localhost,127.0.0.1,host.docker.internal`) into the agent
+container. Harness also sets `NODE_USE_ENV_PROXY=1` when the gateway is
+active: Node's built-in `fetch`/`http` ignore proxy env vars without it
+(fetch since Node 24.0, `http.request` since 24.5 — the base image ships
+Node 24), so Node-based agents (pi, opencode) would otherwise silently
+bypass the proxy. It is inert for non-Node agents (hermes is Python). Squid receives the
 destination hostname unresolved in the `CONNECT` line, checks it against the
 generated `dstdomain` ACL, and forwards allowlisted names only —
 re-resolving per connection, so CDN churn is handled. Denied destinations
@@ -168,6 +182,20 @@ Redshift Data API (`aws redshift-data ...`, served at
 hostname travels unresolved in the CONNECT line. A `.amazonaws.com` suffix
 entry (or a narrower regional prefix) covers it. No client-side DNS and no
 special path are required.
+
+**Host-local destinations (`host.docker.internal`) — direct connection.**
+The host is inside the trust boundary (it is where harness itself runs and
+where workspace mounts, env files, and local services like LM Studio on
+`:1234` come from), so host-local entries do not go through the gateway at
+all: harness adds `host.docker.internal` to `NO_PROXY` and the agent
+connects directly over the isolated network. Reachability uses the
+platform's existing mechanism — automatic on Docker Desktop, Linux via
+`--add-host host.docker.internal:host-gateway` (docker 20.10+), Apple
+container via the documented `container system dns` setup harness already
+checks. Implementation must verify the host-gateway route survives on an
+`--internal` network per platform; if Docker Desktop blocks it there, the
+fallback is a host-loopback forward on a minimal gateway (the deferred
+socat machinery), not a design change.
 
 **Raw TCP (direct database drivers) — deferred extension, not in v1.**
 Direct-driver Redshift (psql / psycopg2 / redshift_connector on port 5439)
@@ -184,6 +212,25 @@ resolves and re-resolves it per connection. Un-proxied connection attempts
 to any destination fail at the network boundary. Which names the container
 looks up via docker's embedded DNS is not filtered; that leaks lookups, not
 traffic. Acceptable; noted.
+
+### Airgap mode (`--egress none`)
+
+An empty allowlist is the degenerate — and cheapest — case: with no
+internet destinations there is nothing to filter, so **no gateway container
+is created at all**. Harness creates only the `--internal` network and
+attaches the agent container to it. The result is a true airgap: no route
+off-host in either direction except the host itself, which remains
+reachable as above.
+
+```bash
+harness --local --egress none        # agent + LM Studio on :1234, nothing else
+```
+
+This pairs naturally with local mode (no `-e`): the agent talks to
+`host.docker.internal:1234` and nothing else exists to talk to. Note the
+distinction from `docker run --network none`: the `none` network removes
+all interfaces including the host route, which would break local-LLM usage
+too — the airgap still needs the internal network's host gateway.
 
 ### Gateway image
 
@@ -205,9 +252,10 @@ existing Dockerfile conventions.
    subnets already in use (checked via `docker network inspect`; pool
    overridable with `HARNESS_EGRESS_SUBNET`; the shipped default is a
    documentation-reserved range, defined once in code).
-2. `docker network create --internal harness-egress-<runid> <subnet>`;
-   gateway attaches to this network (static IP `.2`) **and** the default
-   bridge (the external leg).
+2. `docker network create --internal harness-egress-<runid> <subnet>`.
+   Skipped-if-empty: when the allowlist has no internet entries (airgap
+   mode), no gateway is started. Otherwise the gateway attaches to this
+   network (static IP `.2`) **and** the default bridge (the external leg).
 3. Agent container: `--network harness-egress-<runid>` plus the proxy env
    injection (no `--dns` in v1 — see DNS note above). `--env-file` values still flow in; because
    harness appends its `-e` args after `--env-file`, harness's proxy vars
@@ -234,9 +282,10 @@ existing Dockerfile conventions.
 
 ### What the agent sees
 
-`HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY` env vars pointing at the gateway.
-(With the deferred raw-TCP extension, also split-horizon DNS answers.) This
-is a convenience, not the
+`HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY` env vars pointing at the gateway
+(airgap mode: only `NO_PROXY`, nothing to proxy). (With the deferred
+raw-TCP extension, also split-horizon DNS answers.) This is a convenience,
+not the
 security boundary — the boundary is `--internal` routing. The RFC's contract
 statement for docs: **egress allowlisting is enforced by network topology;
 env vars are hints that reduce surprise, not controls.**
@@ -294,6 +343,13 @@ Walked one-by-one with the PR; rulings pinned in the table below.
   vs. block the whole feature on apple support. *Recommendation:* fail
   closed with a clear error; document the gap (same posture as the
   `--security-opt` note).
+- **D6 — Airgap mode + host-local entries** (raised in PR review
+  2026-10-08: "allowlist: none" for local-LLM usage). Empty allowlist
+  selects no-gateway airgap; `host.docker.internal[:port]` entries connect
+  directly with advisory ports in v1. Alternatives: block on empty
+  allowlists entirely, or enforce host ports via the gateway in v1 (costs
+  the deferred machinery now). *Recommendation:* as specified — the host
+  is inside the trust boundary and the airgap itself is the enforcement.
 
 ### Decision log
 
@@ -303,6 +359,7 @@ Walked one-by-one with the PR; rulings pinned in the table below.
 | D2 | Flag surface as specified | | |
 | D3 | Gateway: in-repo squid+dnsmasq+socat | | |
 | D4 | Raw TCP: v1 CONNECT-only; split-horizon deferred | Steered in PR review 2026-10-08 (aws-CLI access is HTTPS; direct-driver need unconfirmed) | 2026-10-08 |
+| D6 | Airgap mode + host-local entries, advisory ports | | |
 | D5 | Apple runtime: fail closed for `--egress` | | |
 
 ## Implementation checklist
@@ -331,6 +388,13 @@ Tier 2:
       static gateway IP
 - [ ] squid ACL generation from the allowlist (HTTPS/CONNECT, 443 only;
       non-443 entries rejected with a clear error)
+- [ ] Airgap mode: empty allowlist ⇒ internal network, no gateway, host
+      reachable; e2e argv test + smoke scenario (local-LLM shape: helper on
+      host-reachable port answers, internet helper unreachable)
+- [ ] Host-local entry class: `NO_PROXY` injection, `--add-host
+      host-gateway` on Linux, advisory-port semantics + error copy
+- [ ] Verify host-gateway route survives `--internal` per platform (Docker
+      Desktop, Linux engine); document fallback if not
 - [ ] e2e argv tests + integration smoke scenario (allowlisted pass,
       non-allowlisted fail, raw-TCP forward)
 - [ ] USAGE / README ("Egress control" section) / AGENTS.md updates
