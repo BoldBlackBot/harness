@@ -1,8 +1,8 @@
-FROM debian:stable-slim@sha256:5bc3287b25407c965a30f38e32603dc253a3869e1b12a21ac09bfc27fd8b13ce
+FROM debian:stable-slim@sha256:eb593cf2c358cacef45ca0a424bbc7d30cfa3466265fc2662b9466a0ca6ba1c5
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-ARG GH_VERSION="2.101.0"
+ARG GH_VERSION="2.102.0"
 ARG TARGETARCH
 
 # hadolint ignore=DL3008
@@ -48,8 +48,8 @@ ENV PNPM_HOME=/usr/local/share/pnpm
 ENV PNPM_CONFIG_MINIMUM_RELEASE_AGE=10080
 ENV PATH=$PNPM_HOME/bin:$PNPM_HOME:$PATH
 
-RUN corepack enable && corepack prepare pnpm@12.7.0 --activate && \
-    pnpm install -g @earendil-works/pi-coding-agent@0.87.1 && \
+RUN corepack enable && corepack prepare pnpm@12.12.1 --activate && \
+    pnpm install -g @earendil-works/pi-coding-agent@1.1.0 && \
     pnpm store prune && \
     rm -rf ~/.cache/pnpm ~/.npm && \
     mkdir -p /etc/harness/pi-defaults && \
@@ -58,10 +58,10 @@ RUN corepack enable && corepack prepare pnpm@12.7.0 --activate && \
 COPY pi/models.json /etc/harness/pi-defaults/models.json
 
 # Install mise (polyglot version manager)
-# Checksums from: https://github.com/jdx/mise/releases/download/v2026.9.15/SHASUMS256.txt
-ENV MISE_VERSION=2026.9.15
-ENV MISE_AMD64_SHA256=09ea631d6f3e7031d63606a0892dc4c796f9fb57f493bc45937f9f7113c88216
-ENV MISE_ARM64_SHA256=385e61f3e76a6781795eea541c45bba4cab32d137b84d961fa97f15cb4521156
+# Checksums from: https://github.com/jdx/mise/releases/download/v2026.10.8/SHASUMS256.txt
+ENV MISE_VERSION=2026.10.8
+ENV MISE_AMD64_SHA256=c72477ae6c3a8e7d817a322f43da70e4643e75ee5c21265f1c19c894273b7428
+ENV MISE_ARM64_SHA256=6ee0bd8173f1347514f4974d55fb1fae13aa7f6de0a55338adbefa0667cad7e5
 RUN set -eux && \
     ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" && \
     case "${ARCH}" in \
