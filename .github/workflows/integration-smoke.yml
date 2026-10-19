@@ -78,6 +78,16 @@ jobs:
           build-args: BASE_IMAGE=localhost:5000/harness:test
           tags: localhost:5000/harness:hermes-test
 
+      # The builds above push to the local registry only; the docker daemon's
+      # image store stays empty (buildx container driver). The smoke script's
+      # preflight requires the images in the local store, so pull the tags
+      # back from the registry.
+      - name: Pull images into local store
+        run: |
+          docker pull localhost:5000/harness:test
+          docker pull localhost:5000/harness:opencode-test
+          docker pull localhost:5000/harness:hermes-test
+
       # --- Write env file ---
 
       - name: Write env file
