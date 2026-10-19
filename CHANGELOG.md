@@ -1,5 +1,61 @@
 # Changelog
 
+## [1.11.0] - 2026-10-19
+
+### Summary
+
+Maintenance release. The headline is the new opt-in `--egress <allowlist>` flag (Tier-2 egress control): run an agent container with no external network route except the HTTPS hosts you allowlist — `harness --egress api.github.com,.openrouter.ai` builds a per-run internal network plus a squid CONNECT-only gateway (allow `host:port` / raw TCP is deferred; use each service's HTTPS endpoint). Also fixes three egress subnet/sweep bugs found in end-to-end smoke testing, hardens the agent entrypoints, and fixes the release-gating integration suite (built images are now pulled into the local docker store before smoke runs, and the smoke model is back on an OpenRouter-carried model). Dependency refresh: `hermes-agent` v2026.9.24 → v0.21.6 (upstream switched to `vX.Y.Z` tag names), `pi-coding-agent` 0.87.1 → 1.1.0 (its 1.0: fullscreen TUI, codemode/MCP wave), `opencode-ai` 1.19.0, and CPython 3.13.15 → 3.14.7 in the hermes image (required by hermes v0.21.6's core deps). No CLI changes beyond the new flag.
+
+### Dependency Updates
+
+- updated hermes-agent from v2026.9.24 to v0.21.6
+- updated @earendil-works/pi-coding-agent from 0.87.1 to 1.1.0
+- updated opencode-ai from 1.18.32 to 1.19.0
+- updated gh from 2.101.0 to 2.102.0
+- updated uv from 0.12.19 to 0.13.0
+- updated pnpm from 12.7.0 to 12.12.1
+- updated mise from 2026.9.15 to 2026.10.8
+- updated CPython (uv-managed, hermes image) from 3.13.15 to 3.14.7
+- updated debian base image digest
+
+### Upstream Release Notes
+
+#### hermes-agent v2026.9.24 → v0.21.6
+
+**v0.21.6** — First release cut by the new stable release pipeline (one attempt ref, a tested Docker image, a receipt tag at publish). Rolls up ~2,100 merged PRs / ~8,867 non-merge commits since v0.21.5; full curated notes deferred to v0.22.0. Undocumented-on-purpose highlights listed in the release body include: live streaming transcription on CLI/TUI/Desktop (`stt.streaming`); voice-chat turns routed to a dedicated model with reasoning off; third-party plugin isolation via per-profile plugin hosts (`plugins.isolation: host`) and a Settings ▸ Plugins home; favorite/pinned models, usage chips, and rate-limit reasons in the Desktop picker; local models in `hermes model` plus llama.cpp CUDA on Linux x64/arm64; pluggable layered language packs; summary-first `hermes status` (`--short`/`--full`); review-pane diff scope selector; cron-store writability warnings; approval flags for credential uploads and invisible Unicode in terminal commands; Discord setup with token check; GPT-6.1 Sol and Claude Sonnet 5.5 / Haiku 5.5 in catalogs. Security: dashboard auth hardening — spoofed `X-Forwarded-For` resetting the rate limit, unbounded auth audit-log values, missing request-body size limit on `/auth/` routes, and a non-loopback login-code redirect allowing session takeover (reported by Tenable, TRA-725..728).
+
+#### @earendil-works/pi-coding-agent 0.87.1 → 1.1.0
+
+**v0.99.0** — Codemode and MCP: connect MCP servers (stdio or streamable HTTP, with OAuth) from `mcp.json` or `pi mcp add|remove|list|login|logout`; the `codemode` tool runs model-written JavaScript in a QuickJS sandbox that calls pi's tools in parallel; `tool_search` declares undeclared tools on demand. System theme from the terminal's own palette; Sign in with ChatGPT; experimental virtual models (extensions route each request to a different physical model); classifier models from codemode or llama.cpp.
+
+**v0.99.1** — GPT-6.1 Sol on OpenAI, Azure OpenAI, and OpenAI Codex (new Codex default); fix for `/login openai` failing in the bundled release with a missing `openai-chatgpt.js` module.
+
+**v0.99.2** — MCP stays out of the way: `codemode`-exposed servers no longer block the first prompt; `oauth.clientName` for picky OAuth clients; `"auth": {"provider": …}` bearer tokens from a provider's `/login`; Anthropic workload identity federation; `/reload` enables newly added `defaultTools`.
+
+**v1.0.0** — Fullscreen TUI by default (`tuiMode: "regular"` keeps scrollback); ~40% leaner codemode prompts with recovery-oriented errors; `models.generateImages()` in codemode scripts using session credentials; Radius sign-in from `/login`; Anthropic copy-code login for headless setups; MCP OAuth hardening (`authServerMetadataUrl`, RFC 9207 `iss` checks, per-server credentials, step-up sign-in); `quietStartup: "header"`.
+
+**v1.0.1** — Nix flake (`nix run github:earendil-works/pi/stable`); project overrides for user-level MCP servers (`.pi/mcp.json` can enable/disable/re-expose per project); MCP Client ID Metadata Documents (`oauth.clientRegistration: "cimd"`); `pi.registerToolRenderer()` for unregistered tools; Cloudflare Clef classifiers.
+
+**v1.0.2** — `samplingParamsByThinkingLevel` in `models.json` for per-thinking-level sampling overrides on OpenAI-compatible APIs.
+
+**v1.0.3** — Azure provider renamed `azure-openai-responses` → `azure` (breaking: rename the `auth.json` key or re-`/login`, plus `models.json`/`settings.json` references); Azure Foundry Chat Completions deployments starting with `azure/deepseek-v4-pro`; codemode `image()` saves to temp files; fixes for cancelled-OAuth `refresh_token_invalidated`, codemode dying after a pnpm global update, and `read EIO` crashes when the terminal goes away.
+
+**v1.0.4** — `*` patterns in `--tools`/`--exclude-tools` (e.g. `--tools read,codemode,'mcp__radius__*'`); `--no-mcp` for one run; codemode `read()` returns image blocks; fixes for multiline syntax highlighting, MCP native-client registration (`invalid_redirect_uri`), MCP session shutdown races, stalled Bedrock HTTP/2 retries, and codemode built-in patching crashes.
+
+**v1.1.0** — OSC 7501 program status reporting (working/blocked/done/failed) for terminals and agent dashboards; Claude Haiku 5.5; `+name`/`-name` `--tools` entries that adjust the default selection instead of replacing it; GPT-6 Luna as a classifier (Decisions API, image input); native llama.cpp decision models (Julia-1, Laya, Kev, lev, OpenJev) via `/v1/systemone`.
+
+#### opencode-ai 1.18.32 → 1.19.0
+
+**v1.19.0** — `opencode upgrade --major` upgrades to OpenCode 2; TUI `/update` installs updates manually (no more auto-updates on launch); allow the OpenAI `ultrafast` service tier; validate PTY connection origins and tickets.
+
+### Changes
+
+- 868c5ba RFC: opt-in egress allowlisting for agent containers (#195)
+- fd4ba01 deps: bump gh 2.101.0->2.102.0, pi 0.87.1->1.1.0, opencode 1.18.32->1.19.0, uv 0.12.19->0.13.0, pnpm 12.7.0->12.12.1, mise 2026.9.15->2026.10.8, hermes v2026.9.24->v0.21.6, debian digest (#196)
+- 43b6973 fix: egress subnet/sweep bugs + agent entrypoint hardening (smoke-tested end to end) (#197)
+- 11cccdc fix: hermes image CPython 3.13.15 -> 3.14.7 so hermes v0.21.6 installs its core deps (#198)
+- dddcc0b fix(ci): integration smoke — pull built images into local store; restore OpenRouter model (#199)
+
 ## [1.10.4] - 2026-10-04
 
 ### Summary
