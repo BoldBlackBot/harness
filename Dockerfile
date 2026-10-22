@@ -1,4 +1,4 @@
-FROM debian:stable-slim@sha256:eb593cf2c358cacef45ca0a424bbc7d30cfa3466265fc2662b9466a0ca6ba1c5
+FROM debian:stable-slim@sha256:a717a33469731894e77e912ea7d714e27c2dc38ee6554fd1a3102e92999cfc66
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
@@ -48,8 +48,23 @@ ENV PNPM_HOME=/usr/local/share/pnpm
 ENV PNPM_CONFIG_MINIMUM_RELEASE_AGE=10080
 ENV PATH=$PNPM_HOME/bin:$PNPM_HOME:$PATH
 
-RUN corepack enable && corepack prepare pnpm@12.12.1 --activate && \
-    pnpm install -g @earendil-works/pi-coding-agent@1.1.0 && \
+# corepack's registry.npmjs.org fetches (package metadata + the @pnpm/exe
+# binary) intermittently fail at the CDN edge (503 after a ~120s hang).
+# corepack has no built-in retry, so a single blip fails the whole build.
+RUN set -eux; \
+    corepack enable; \
+    attempt=1; \
+    until corepack prepare pnpm@12.12.1 --activate; do \
+        if [ "$attempt" -ge 5 ]; then echo "corepack prepare failed after $attempt attempts" >&2; exit 1; fi; \
+        echo "corepack prepare attempt $attempt failed; retrying in 15s"; \
+        attempt=$((attempt+1)); sleep 15; \
+    done; \
+    attempt=1; \
+    until pnpm install -g @earendil-works/pi-coding-agent@1.1.0; do \
+        if [ "$attempt" -ge 5 ]; then echo "pnpm install failed after $attempt attempts" >&2; exit 1; fi; \
+        echo "pnpm install attempt $attempt failed; retrying in 15s"; \
+        attempt=$((attempt+1)); sleep 15; \
+    done; \
     pnpm store prune && \
     rm -rf ~/.cache/pnpm ~/.npm && \
     mkdir -p /etc/harness/pi-defaults && \
