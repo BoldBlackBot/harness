@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.11.1] - 2026-10-22
+
+### Summary
+
+Security maintenance release responding to the eMudhra intermediate-CA compromise (2026-10-20: eight eMudhra intermediate CA keys publicly recoverable since April 2025 — any client whose CA bundle still trusts `emSign ECC Root CA - G3` can be MITM'd). The Debian base digest rotates forward to pick up `ca-certificates` 20260816, which distrusts the emSign roots — load-bearing because hermes-agent v0.21.6 routes TLS through the OS certificate store, making the image's Debian store the runtime trust source for the hermes venv. uv moves 0.13.0 → 0.13.4 (its vendored CA bundle still trusted the emSign root; GHSA-hq85-5cpj-mr62), and `certifi==2026.10.19` is explicitly installed into the hermes venv (upstream exact-pins a vulnerable 2026.5.20; GHSA-6q48-6c7w-9gw2) until the hermes-agent clone ref moves past a release carrying the fix. The base image's corepack/pnpm installs also gain retry loops — registry.npmjs.org fetches intermittently fail with 503 at the CDN edge and corepack has no built-in retry.
+
+### Dependency Updates
+
+- updated uv from 0.13.0 to 0.13.4
+- added explicit `certifi==2026.10.19` install to the hermes venv (was transitive 2026.5.20 via hermes-agent)
+- updated debian base image digest (ca-certificates 20260816, emSign root distrust)
+
+### Changes
+
+- ab21993 fix(deps): eMudhra emSign root removal — uv 0.13.4, certifi 2026.10.19, debian digest rotation (#202)
+
 ## [1.11.0] - 2026-10-19
 
 ### Summary
