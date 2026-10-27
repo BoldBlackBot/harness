@@ -54,13 +54,13 @@ ENV PATH=$PNPM_HOME/bin:$PNPM_HOME:$PATH
 RUN set -eux; \
     corepack enable; \
     attempt=1; \
-    until corepack prepare pnpm@12.12.1 --activate; do \
+    until corepack prepare pnpm@12.14.0 --activate; do \
         if [ "$attempt" -ge 5 ]; then echo "corepack prepare failed after $attempt attempts" >&2; exit 1; fi; \
         echo "corepack prepare attempt $attempt failed; retrying in 15s"; \
         attempt=$((attempt+1)); sleep 15; \
     done; \
     attempt=1; \
-    until pnpm install -g @earendil-works/pi-coding-agent@1.1.0; do \
+    until pnpm install -g @earendil-works/pi-coding-agent@1.3.0; do \
         if [ "$attempt" -ge 5 ]; then echo "pnpm install failed after $attempt attempts" >&2; exit 1; fi; \
         echo "pnpm install attempt $attempt failed; retrying in 15s"; \
         attempt=$((attempt+1)); sleep 15; \
@@ -73,10 +73,10 @@ RUN set -eux; \
 COPY pi/models.json /etc/harness/pi-defaults/models.json
 
 # Install mise (polyglot version manager)
-# Checksums from: https://github.com/jdx/mise/releases/download/v2026.10.8/SHASUMS256.txt
-ENV MISE_VERSION=2026.10.8
-ENV MISE_AMD64_SHA256=c72477ae6c3a8e7d817a322f43da70e4643e75ee5c21265f1c19c894273b7428
-ENV MISE_ARM64_SHA256=6ee0bd8173f1347514f4974d55fb1fae13aa7f6de0a55338adbefa0667cad7e5
+# Checksums from: https://github.com/jdx/mise/releases/download/v2026.10.13/SHASUMS256.txt
+ENV MISE_VERSION=2026.10.13
+ENV MISE_AMD64_SHA256=94c45523c7b6760b7da704f16051171ca32e8447a849a02266a439a4455e9a12
+ENV MISE_ARM64_SHA256=983fabf36625566f216400b907b33b4daca99adb5bc3d3cdab123b5e791575b2
 RUN set -eux && \
     ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" && \
     case "${ARCH}" in \

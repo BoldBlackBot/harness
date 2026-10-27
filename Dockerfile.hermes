@@ -104,7 +104,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         python3-dev build-essential git libffi-dev libolm-dev \
     && uv python install --no-cache 3.14.7 \
-    && git clone --depth 1 --branch v0.21.6 https://github.com/NousResearch/hermes-agent.git /opt/hermes-agent \
+    && git clone --depth 1 --branch v0.22.2 https://github.com/NousResearch/hermes-agent.git /opt/hermes-agent \
     && uv venv /opt/hermes-agent/venv --python 3.14.7 \
     && VIRTUAL_ENV=/opt/hermes-agent/venv uv pip install --no-cache-dir --exclude-newer="$(date -u -d '7 days ago' '+%Y-%m-%dT%H:%M:%SZ')" -e /opt/hermes-agent[mcp,web,pty,matrix,bedrock,slack] "python-telegram-bot==22.6" "faster-whisper==1.2.1" "kokoro-onnx==0.5.0" \
     && VIRTUAL_ENV=/opt/hermes-agent/venv uv pip install --no-cache-dir --exclude-newer-package 'certifi=2999-01-01T00:00:00Z' "certifi==2026.10.19" \
