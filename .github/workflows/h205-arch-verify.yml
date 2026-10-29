@@ -87,11 +87,3 @@ jobs:
           grep -o "<title>[^<]*</title>" /tmp/body.html | head -1
           [ "$CODE" = "200" ] || exit 1
           docker rm -f h205fix >/dev/null
-
-      - name: Upload boot logs
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae65e6e7c1c64a875d1fc6a0a # v7
-        with:
-          name: h205-${{ matrix.arch }}-logs
-          path: |
-            build.log
