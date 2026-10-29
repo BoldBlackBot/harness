@@ -39,7 +39,7 @@ RUN set -eux && \
         /tmp/cosign_checksums.txt && \
     rm -f /tmp/cosign_checksums.txt /tmp/cosign_checksums.txt.sigstore.json && \
     apt-get update -qq && \
-    apt-get install -y --no-install-recommends python3 python3-venv python3-snappy && \
+    apt-get install -y --no-install-recommends python3 python3-venv python3-snappy sqlite3 && \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=uv-src /uv /usr/local/bin/uv
@@ -106,7 +106,7 @@ RUN apt-get update && \
     && uv python install --no-cache 3.14.7 \
     && git clone --depth 1 --branch v0.22.2 https://github.com/NousResearch/hermes-agent.git /opt/hermes-agent \
     && uv venv /opt/hermes-agent/venv --python 3.14.7 \
-    && VIRTUAL_ENV=/opt/hermes-agent/venv uv pip install --no-cache-dir --exclude-newer="$(date -u -d '7 days ago' '+%Y-%m-%dT%H:%M:%SZ')" -e /opt/hermes-agent[mcp,web,pty,matrix,bedrock,slack] "python-telegram-bot==22.6" "faster-whisper==1.2.1" "kokoro-onnx==0.5.0" \
+    && VIRTUAL_ENV=/opt/hermes-agent/venv uv pip install --no-cache-dir --exclude-newer="$(date -u -d '7 days ago' '+%Y-%m-%dT%H:%M:%SZ')" -e /opt/hermes-agent[mcp,web,pty,matrix,bedrock,slack,anthropic] "python-telegram-bot==22.6" "faster-whisper==1.2.1" "kokoro-onnx==0.5.0" \
     && VIRTUAL_ENV=/opt/hermes-agent/venv uv pip install --no-cache-dir --exclude-newer-package 'certifi=2999-01-01T00:00:00Z' "certifi==2026.10.19" \
     && ln -sf /opt/hermes-agent/venv/bin/hermes /usr/local/bin/hermes \
     && cd /opt/hermes-agent/web && npm install && npm run build && cd / \
