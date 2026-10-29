@@ -1,0 +1,95 @@
+name: h205 arch verify
+
+on:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    name: ${{ matrix.arch }} verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+
+    steps:
+      - name: Report host arch
+        run: |
+          uname -m
+          docker version --format 'client={{.Client.Arch}} server={{.Server.Arch}}'
+          docker info --format 'arch={{.Architecture}}'
+
+      - name: Pull published control image (hermes v0.22.2 = b0cb7eb)
+        run: docker pull ghcr.io/boldblackai/harness:hermes-b0cb7eb
+
+      - name: Control boot test (published .22 image, expect CRASH)
+        run: |
+          set -o pipefail
+          docker rm -f h205ctl >/dev/null 2>&1 || true
+          docker run -d --name h205ctl ghcr.io/boldblackai/harness:hermes-b0cb7eb \
+            hermes dashboard --host 127.0.0.1 --port 29154 >/dev/null
+          for i in $(seq 1 30); do
+            logs=$(docker logs h205ctl 2>&1)
+            echo "$logs" | grep -qE "HERMES_DASHBOARD_READY|Web UI build failed" && break
+            docker inspect -f '{{.State.Status}}' h205ctl | grep -q exited && break
+            sleep 3
+          done
+          echo "--- control boot log ---"
+          docker logs h205ctl
+          st=$(docker inspect -f '{{.State.Status}} exit={{.State.ExitCode}}' h205ctl)
+          echo "final state: $st"
+          docker logs h205ctl 2>&1 | grep -q "Web UI build failed" \
+            && echo "CONTROL-CRASH-REPRODUCED (expected on ${{ matrix.arch }})" \
+            || { echo "CONTROL-DID-NOT-CRASH (unexpected!)"; exit 1; }
+          docker rm -f h205ctl >/dev/null
+
+      - name: Checkout fixed branch
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          repository: BoldBlackBot/harness
+          ref: fix/204-dashboard-boot-rebuild
+
+      - name: Build fixed hermes variant (native ${{ matrix.arch }})
+        run: |
+          docker build -f Dockerfile.hermes \
+            --build-arg BASE_IMAGE=ghcr.io/boldblackai/harness:b0cb7eb \
+            -t harness:h205-fix . 2>&1 | tee build.log | tail -5
+
+      - name: Receipt + env of fixed image
+        run: |
+          docker run --rm --user root --entrypoint cat harness:h205-fix /opt/hermes-agent/hermes_cli/web_dist/hermes-build.json \
+            | python3 -c "import json,sys; d=json.load(sys.stdin); print('receipt node:', d['node']); print('arch:', d.get('arch'))"
+          docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' harness:h205-fix | grep HERMES
+
+      - name: Fixed boot test (expect READY + HTTP 200)
+        run: |
+          docker rm -f h205fix >/dev/null 2>&1 || true
+          docker run -d --name h205fix harness:h205-fix \
+            hermes dashboard --host 127.0.0.1 --port 29155 >/dev/null
+          ok=""
+          for i in $(seq 1 40); do
+            docker logs h205fix 2>&1 | grep -q "HERMES_DASHBOARD_READY" && { ok=1; break; }
+            docker inspect -f '{{.State.Status}}' h205fix | grep -q exited && break
+            sleep 3
+          done
+          echo "--- fixed boot log ---"
+          docker logs h205fix
+          if [ -z "$ok" ]; then echo "FIXED-BOOT-FAILED"; docker inspect -f 'state={{.State.Status}} exit={{.State.ExitCode}}' h205fix; exit 1; fi
+          CODE=$(curl -s -m 5 -o /tmp/body.html -w "%{http_code}" http://127.0.0.1:29155/ || echo 000)
+          echo "HTTP / status: $CODE"
+          grep -o "<title>[^<]*</title>" /tmp/body.html | head -1
+          [ "$CODE" = "200" ] || exit 1
+          docker rm -f h205fix >/dev/null
+
+      - name: Upload boot logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae65e6e7c1c64a875d1fc6a0a # v7
+        with:
+          name: h205-${{ matrix.arch }}-logs
+          path: |
+            build.log
