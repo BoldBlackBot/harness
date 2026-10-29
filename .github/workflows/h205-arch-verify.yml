@@ -33,7 +33,7 @@ jobs:
         run: |
           set -o pipefail
           docker rm -f h205ctl >/dev/null 2>&1 || true
-          docker run -d --name h205ctl ghcr.io/boldblackai/harness:hermes-b0cb7eb \
+          docker run -d --network host --name h205ctl ghcr.io/boldblackai/harness:hermes-b0cb7eb \
             hermes dashboard --host 127.0.0.1 --port 29154 >/dev/null
           for i in $(seq 1 30); do
             logs=$(docker logs h205ctl 2>&1)
@@ -71,7 +71,7 @@ jobs:
       - name: Fixed boot test (expect READY + HTTP 200)
         run: |
           docker rm -f h205fix >/dev/null 2>&1 || true
-          docker run -d --name h205fix harness:h205-fix \
+          docker run -d --network host --name h205fix harness:h205-fix \
             hermes dashboard --host 127.0.0.1 --port 29155 >/dev/null
           ok=""
           for i in $(seq 1 40); do
