@@ -1,6 +1,8 @@
 name: h205 arch verify
 
 on:
+  push:
+    branches: [h205-verify]
   workflow_dispatch:
 
 jobs:
